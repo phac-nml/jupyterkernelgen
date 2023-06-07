@@ -1,0 +1,3 @@
+build/*
+jupyterkernelgen.egg-info/*
+jupyterkernelgen/__pycache__/*
