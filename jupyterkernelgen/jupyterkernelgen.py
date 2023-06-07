@@ -18,7 +18,16 @@ class colors:
     FAIL = '\033[91m'
     ENDC = '\033[0m'
 
-def check_for_conda():
+def clean_exit(exit_code, path=None):
+    try:
+        if path != None:
+            shutil.rmtree(path)
+    except shutil.Error as e:
+        print(f"{colors.FAIL}failed to remove directory: {e}{colors.ENDC}")
+
+    sys.exit(exit_code)
+
+def check_for_conda(path):
     print(f"{colors.HEADER}LOOKING FOR CONDA...{colors.ENDC}")
 
     conda_exe = None
@@ -32,17 +41,18 @@ def check_for_conda():
             conda_exe = shutil.which("conda") # try finding conda if mamba isn't available
         except shutil.Error as e:
             print(f"{colors.FAIL}error occurred getting conda from path: {e}{colors.ENDC}", file=sys.stderr)
-            exit(1)
+            clean_exit(1, path)
 
         if conda_exe == None:
             print(f"{colors.FAIL}no conda executable on the path. Exiting...{colors.ENDC}", file=sys.stderr)
-            sys.exit(1)
+            clean_exit(1, path)
 
     print(f"- found conda executable: {colors.OK}{conda_exe}{colors.ENDC}\n")
 
     return conda_exe
 
-def get_conda_env():
+def get_conda_env(path):
+    conda_env = None
     try:
         # replace ~ with user's home directory and make it an absolute path
         # if ~ is not used to refer to the user's home directory, it will
@@ -53,11 +63,11 @@ def get_conda_env():
             print(f"- found conda env: {colors.OK}{conda_env}{colors.ENDC}\n")
         else:
             print(f"{colors.FAIL}given conda env path is not a conda environment. Exiting...{colors.ENDC}", file=sys.stderr)
-            sys.exit(1)
+            clean_exit(1, path)
 
     except OSError as e:
         print(f"{colors.FAIL}error occurred checking directory: {e}{colors.ENDC}", file=sys.stderr)
-        sys.exit(1)
+        clean_exit(1, path)
 
     return conda_env
 
@@ -89,7 +99,7 @@ def ipykernel_installed(conda_env):
 
     return found_ipython and found_kernel
 
-def install_ipykernel(conda_exe, conda_env):
+def install_ipykernel(conda_exe, conda_env, path):
     # only install if the user enters `y`
     print(f"{colors.HEADER}INSTALL ipykernel? [y/N]{colors.ENDC} ", end="", flush=True)
 
@@ -99,12 +109,12 @@ def install_ipykernel(conda_exe, conda_env):
             subprocess.run([conda_exe, "install", "-p", conda_env, "-y", "ipykernel"])
         except subprocess.CalledProcessError as e:
             print(f"{colors.FAIL}ipykernel installation failed: {e}{colors.ENDC}", file=sys.stderr)
-            exit(1)
+            clean_exit(1, path)
     else:
         # exit the script if the user does not want to install ipykernel since
         # we cannot continue without it
         print(f"{colors.FAIL}not installing ipykernel. Exiting...{colors.ENDC}", file=sys.stderr)
-        sys.exit(0)
+        clean_exit(0, path)
     print()
 
 def get_kernel_name():
@@ -115,16 +125,17 @@ def get_kernel_name():
 
 def create_kernel_dir(kernel_name):
     print(f"{colors.HEADER}CREATING KERNEL DIRECTORY...{colors.ENDC}")
+    path = None
     try:
         # replace ~ with the path to the user's home directory
         path = os.path.expanduser(f"~/.local/share/jupyter/kernels/{kernel_name}")
         if os.path.exists(path):
             print(f"{colors.FAIL}Environment with that name already exists. Exiting...{colors.ENDC}", file=sys.stderr)
-            sys.exit(1)
+            clean_exit(1)
         os.makedirs(path, exist_ok=True)
     except OSError as e:
         print(f"{colors.FAIL}Failed to create directory: {e}{colors.ENDC}", file=sys.stderr)
-        sys.exit(1)
+        clean_exit(1)
     print()
     return path
 
@@ -141,7 +152,7 @@ exec "$@"
         f.close()
     except OSError as e:
         print(f"{colors.FAIL}failed to write to {path}/kernel-helper.sh: {e}{colors.ENDC}", file=sys.stderr)
-        sys.exit(1)
+        clean_exit(1, path)
     print()
 
 def create_kernel_json(path, kernel_name):
@@ -157,10 +168,11 @@ def create_kernel_json(path, kernel_name):
         f.close()
     except OSError as e:
         print(f"{colors.FAIL}failed to write to {path}/kernel.json: {e}{colors.ENDC}", file=sys.stderr)
-        sys.exit(1)
+        clean_exit(1, path)
     print()
 
 def main():
+    path = None
     try:
         # Get the name of the kernel
         kernel_name = get_kernel_name()
@@ -169,21 +181,21 @@ def main():
         path = create_kernel_dir(kernel_name)
 
         # Make sure conda or mamba is installed
-        conda_exe = check_for_conda()
+        conda_exe = check_for_conda(path)
 
         # Figure out which conda environment to use
-        conda_env = get_conda_env()
+        conda_env = get_conda_env(path)
 
         # Ensure that ipykernel is installed
         installed = ipykernel_installed(conda_env)
         if not installed:
             # Install ipykernel if necessary
-            install_ipykernel(conda_exe, conda_env)
+            install_ipykernel(conda_exe, conda_env, path)
 
             # Exit if ipykernel failed to install
             if not ipykernel_installed(conda_env):
                 print(f"{colors.FAIL}ipykernel installation failed. Exiting...{colors.ENDC}")
-                sys.exit(1)
+                clean_exit(1, path)
 
         # Create script to launch the kernel
         create_kernel_helper_script(path, conda_env)
@@ -194,7 +206,10 @@ def main():
         print(f"{colors.OK}KERNEL INSTALLATION SUCCESS{colors.ENDC}")
     except KeyboardInterrupt:
         print("EXITING...")
-        sys.exit(1)
+        if path != None:
+            clean_exit(1, path)
+        else:
+            clean_exit(1)
 
 if __name__=="__main__":
     main()
