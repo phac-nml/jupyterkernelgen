@@ -21,7 +21,13 @@ class colors:
     FAIL = '\033[91m'
     ENDC = '\033[0m'
 
-def clean_exit(exit_code, path=None):
+def clean_exit(exit_code: int, path: str | None = None) -> None:
+    """
+    Exit the program and remove the created directory if applicable
+
+    :param exit_code:   the exit code to pass to the operating system
+    :param path:        the path to remove if applicable
+    """
     try:
         if path != None:
             shutil.rmtree(path)
