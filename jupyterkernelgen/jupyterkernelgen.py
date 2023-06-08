@@ -84,7 +84,7 @@ def get_conda_env():
             print(f"{colors.FAIL}given conda env path is not a conda environment. Exiting...{colors.ENDC}", file=sys.stderr)
             raise JupyterKernelGenException
 
-    except OSError as e:
+    except (OSError, EOFError) as e:
         print(f"{colors.FAIL}error occurred checking directory: {e}{colors.ENDC}", file=sys.stderr)
         raise JupyterKernelGenException
 
