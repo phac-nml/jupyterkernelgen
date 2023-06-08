@@ -10,6 +10,9 @@ import subprocess
 readline.set_completer_delims(' \t\n=')
 readline.parse_and_bind("tab: complete")
 
+class JupyterKernelGenException(BaseException):
+    pass
+
 # define ANSI escape codes for coloured text
 class colors:
     HEADER = '\033[95m'
@@ -27,7 +30,13 @@ def clean_exit(exit_code, path=None):
 
     sys.exit(exit_code)
 
-def check_for_conda(path):
+def check_for_conda() -> str:
+    """
+    Looks for a mamba or conda executable on the system with a preference
+    for mamba
+
+    :returns: the path to the mamba or conda executable
+    """
     print(f"{colors.HEADER}LOOKING FOR CONDA...{colors.ENDC}")
 
     conda_exe = None
@@ -41,18 +50,22 @@ def check_for_conda(path):
             conda_exe = shutil.which("conda") # try finding conda if mamba isn't available
         except shutil.Error as e:
             print(f"{colors.FAIL}error occurred getting conda from path: {e}{colors.ENDC}", file=sys.stderr)
-            clean_exit(1, path)
+            raise JupyterKernelGenException
 
         if conda_exe == None:
             print(f"{colors.FAIL}no conda executable on the path. Exiting...{colors.ENDC}", file=sys.stderr)
-            clean_exit(1, path)
+            raise JupyterKernelGenException
 
     print(f"- found conda executable: {colors.OK}{conda_exe}{colors.ENDC}\n")
 
     return conda_exe
 
-def get_conda_env(path):
-    conda_env = None
+def get_conda_env():
+    """
+    Gets a path to a conda environment from the user.
+
+    :returns: the path to the conda environment
+    """
     try:
         # replace ~ with user's home directory and make it an absolute path
         # if ~ is not used to refer to the user's home directory, it will
@@ -63,15 +76,23 @@ def get_conda_env(path):
             print(f"- found conda env: {colors.OK}{conda_env}{colors.ENDC}\n")
         else:
             print(f"{colors.FAIL}given conda env path is not a conda environment. Exiting...{colors.ENDC}", file=sys.stderr)
-            clean_exit(1, path)
+            raise JupyterKernelGenException
 
     except OSError as e:
         print(f"{colors.FAIL}error occurred checking directory: {e}{colors.ENDC}", file=sys.stderr)
-        clean_exit(1, path)
+        raise JupyterKernelGenException
 
     return conda_env
 
-def ipykernel_installed(conda_env):
+def ipykernel_installed(conda_env: str) -> bool:
+    """
+    Checks that the ipykernel is installed by checking for both the
+    ipykernel package and the ipython executable
+
+    :param conda_env:   the path to a conda environment to check
+    :returns:           true if ipykernel and ipython are installed
+                        and false otherwise
+    """
     print(f"{colors.HEADER}CHECKING FOR IPYTHON IN CONDA ENV...{colors.ENDC}")
 
     # We check for both ipykernel and ipython to be installed just to be doubly sure
@@ -99,7 +120,14 @@ def ipykernel_installed(conda_env):
 
     return found_ipython and found_kernel
 
-def install_ipykernel(conda_exe, conda_env, path):
+def install_ipykernel(conda_exe: str, conda_env: str) -> None:
+    """
+    Installs ipykernel into a specific conda envionment using a given
+    conda executable
+
+    :param conda_exe:   the path to the executable for conda
+    :param conda_env:   the path to the environment to install to
+    """
     # only install if the user enters `y`
     print(f"{colors.HEADER}INSTALL ipykernel? [y/N]{colors.ENDC} ", end="", flush=True)
 
@@ -109,21 +137,33 @@ def install_ipykernel(conda_exe, conda_env, path):
             subprocess.run([conda_exe, "install", "-p", conda_env, "-y", "ipykernel"])
         except subprocess.CalledProcessError as e:
             print(f"{colors.FAIL}ipykernel installation failed: {e}{colors.ENDC}", file=sys.stderr)
-            clean_exit(1, path)
+            raise JupyterKernelGenException
     else:
         # exit the script if the user does not want to install ipykernel since
         # we cannot continue without it
         print(f"{colors.FAIL}not installing ipykernel. Exiting...{colors.ENDC}", file=sys.stderr)
-        clean_exit(0, path)
+        raise JupyterKernelGenException
     print()
 
-def get_kernel_name():
+def get_kernel_name() -> str:
+    """
+    Get the name of the kernel to create from the user
+
+    :returns: the name of the kernel
+    """
     print(f"{colors.HEADER}ENTER KERNEL NAME{colors.ENDC}: ", end="", flush=True)
     kernel_name = sys.stdin.readline().strip()
     print()
+
     return kernel_name
 
-def create_kernel_dir(kernel_name):
+def create_kernel_dir(kernel_name: str) -> str:
+    """
+    Create the necessary directory for installing the kernel
+
+    :param kernel_name: the name of the kernel to generate
+    :return:            the path to the new directory
+    """
     print(f"{colors.HEADER}CREATING KERNEL DIRECTORY...{colors.ENDC}")
     path = None
     try:
@@ -131,15 +171,21 @@ def create_kernel_dir(kernel_name):
         path = os.path.expanduser(f"~/.local/share/jupyter/kernels/{kernel_name}")
         if os.path.exists(path):
             print(f"{colors.FAIL}Environment with that name already exists. Exiting...{colors.ENDC}", file=sys.stderr)
-            clean_exit(1)
+            raise JupyterKernelGenException
         os.makedirs(path, exist_ok=True)
     except OSError as e:
         print(f"{colors.FAIL}Failed to create directory: {e}{colors.ENDC}", file=sys.stderr)
-        clean_exit(1)
+        raise JupyterKernelGenException
     print()
     return path
 
-def create_kernel_helper_script(path, conda_env):
+def create_kernel_helper_script(path: str, conda_env: str) -> None:
+    """
+    Create a script that launches the kernel
+
+    :param path:        the path to install the kernel to
+    :param conda_env:   the path to the conda environment to launch with
+    """
     print(f"{colors.HEADER}CREATING KERNEL HELPER SCRIPT...{colors.ENDC}")
     source = f"""#!/bin/bash
 
@@ -152,10 +198,16 @@ exec "$@"
         f.close()
     except OSError as e:
         print(f"{colors.FAIL}failed to write to {path}/kernel-helper.sh: {e}{colors.ENDC}", file=sys.stderr)
-        clean_exit(1, path)
+        raise JupyterKernelGenException
     print()
 
 def create_kernel_json(path, kernel_name):
+    """
+    Create the json defining the kernel
+
+    :param path:        the path to install the kernel to
+    :param kernel_name: the name of the kernel being installed
+    """
     print(f"{colors.HEADER}CREATING KERNEL JSON...{colors.ENDC}")
     source = f"""{{
   "argv": ["{{resource_dir}}/kernel-helper.sh", "python3", "-m", "ipykernel_launcher", "-f", "{{connection_file}}"],
@@ -168,7 +220,7 @@ def create_kernel_json(path, kernel_name):
         f.close()
     except OSError as e:
         print(f"{colors.FAIL}failed to write to {path}/kernel.json: {e}{colors.ENDC}", file=sys.stderr)
-        clean_exit(1, path)
+        raise JupyterKernelGenException
     print()
 
 def main():
@@ -181,16 +233,16 @@ def main():
         path = create_kernel_dir(kernel_name)
 
         # Make sure conda or mamba is installed
-        conda_exe = check_for_conda(path)
+        conda_exe = check_for_conda()
 
         # Figure out which conda environment to use
-        conda_env = get_conda_env(path)
+        conda_env = get_conda_env()
 
         # Ensure that ipykernel is installed
         installed = ipykernel_installed(conda_env)
         if not installed:
             # Install ipykernel if necessary
-            install_ipykernel(conda_exe, conda_env, path)
+            install_ipykernel(conda_exe, conda_env)
 
             # Exit if ipykernel failed to install
             if not ipykernel_installed(conda_env):
@@ -204,7 +256,7 @@ def main():
         create_kernel_json(path, kernel_name)
 
         print(f"{colors.OK}KERNEL INSTALLATION SUCCESS{colors.ENDC}")
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, JupyterKernelGenException) as _:
         print("EXITING...")
         if path != None:
             clean_exit(1, path)
