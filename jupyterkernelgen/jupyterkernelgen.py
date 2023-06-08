@@ -93,7 +93,12 @@ def get_conda_env():
 def ipykernel_installed(conda_env: str) -> bool:
     """
     Checks that the ipykernel is installed by checking for both the
-    ipykernel package and the ipython executable
+    ipykernel package and the ipython executable. We check for files
+    instead of trying to run `ipython --version` because doing so
+    would require activating conda and also checking the error code
+    from the shell which would add a lot of complexity to the function
+    without being any more reliable than just checking for the files
+    directly.
 
     :param conda_env:   the path to a conda environment to check
     :returns:           true if ipykernel and ipython are installed
