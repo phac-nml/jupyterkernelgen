@@ -35,7 +35,7 @@ class text_styles:
     # Reset styling
     END = '\033[0m'
 
-def clean_exit(exit_code: int, path: str | None) -> None:
+def clean_exit(exit_code: int, path: "str | None") -> None:
     """
     Exit the program and remove the created directory if applicable
 
