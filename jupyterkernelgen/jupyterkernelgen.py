@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import re
 import glob
 import shutil
 import sys
@@ -21,7 +22,7 @@ class colors:
     FAIL = '\033[91m'
     ENDC = '\033[0m'
 
-def clean_exit(exit_code: int, path: str | None = None) -> None:
+def clean_exit(exit_code: int, path: str | None) -> None:
     """
     Exit the program and remove the created directory if applicable
 
@@ -157,7 +158,21 @@ def get_kernel_name() -> str:
     :returns: the name of the kernel
     """
     print(f"{colors.HEADER}Enter kernel name{colors.ENDC}: ", end="", flush=True)
-    kernel_name = sys.stdin.readline().strip()
+    try:
+        kernel_name = sys.stdin.readline().strip()
+
+        if re.search(r'^([a-zA-Z0-9]|-|\.|_)+$', kernel_name) == None:
+            raise JupyterKernelGenException("invalid kernel name. Use only letters, numbers, '-', '.', and '_'")
+
+        # Generate potential paths where this kernel name may already be used
+        user_path = os.path.expanduser(f"~/.local/share/jupyter/kernels/{kernel_name}")
+        system_path1 = f"/usr/share/jupyter/kernels/{kernel_name}"
+        system_path2 = f"/usr/local/share/jupyter/kernels/{kernel_name}"
+        env_path = f"{sys.prefix}/share/jupyter/kernels/{kernel_name}"
+        if os.path.exists(user_path) or os.path.exists(system_path1) or os.path.exists(system_path2) or os.path.exists(env_path):
+            raise JupyterKernelGenException("environment with that name already exists")
+    except OSError as e:
+        raise JupyterKernelGenException(f"failed to get kernel name: {e}")
     print()
 
     return kernel_name
@@ -174,8 +189,6 @@ def create_kernel_dir(kernel_name: str) -> str:
     try:
         # replace ~ with the path to the user's home directory
         path = os.path.expanduser(f"~/.local/share/jupyter/kernels/{kernel_name}")
-        if os.path.exists(path):
-            raise JupyterKernelGenException("environment with that name already exists")
         os.makedirs(path, exist_ok=True)
     except OSError as e:
         raise JupyterKernelGenException(f"failed to create directory: {e}")
@@ -227,17 +240,14 @@ def create_kernel_json(path, kernel_name):
 def main():
     path = None
     try:
-        # Get the name of the kernel
-        kernel_name = get_kernel_name()
-
-        # Create a directory for the kernel
-        path = create_kernel_dir(kernel_name)
-
         # Make sure conda or mamba is installed
         conda_exe = check_for_conda()
 
         # Figure out which conda environment to use
         conda_env = get_conda_env()
+
+        # Get the name of the kernel
+        kernel_name = get_kernel_name()
 
         # Ensure that ipykernel is installed
         installed = ipykernel_installed(conda_env)
@@ -250,6 +260,9 @@ def main():
                 print(f"{colors.FAIL}ipykernel installation failed{colors.ENDC}")
                 clean_exit(1, path)
 
+        # Create a directory for the kernel
+        path = create_kernel_dir(kernel_name)
+
         # Create script to launch the kernel
         create_kernel_helper_script(path, conda_env)
 
@@ -259,10 +272,7 @@ def main():
         print(f"{colors.OK}KERNEL INSTALLATION SUCCESS{colors.ENDC}")
     except (KeyboardInterrupt, JupyterKernelGenException) as e:
         print(f"{colors.FAIL}ERROR: {e}{colors.ENDC}\nEXITING...")
-        if path != None:
-            clean_exit(1, path)
-        else:
-            clean_exit(1)
+        clean_exit(1, path)
 
 if __name__=="__main__":
     main()
