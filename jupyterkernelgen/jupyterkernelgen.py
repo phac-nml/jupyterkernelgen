@@ -269,7 +269,7 @@ def main():
         # Create json to define the kernel
         create_kernel_json(path, kernel_name)
 
-        print(f"{colors.OK}KERNEL INSTALLATION SUCCESS{colors.ENDC}")
+        print(f"{colors.OK}Kernel installation success{colors.ENDC}")
     except (KeyboardInterrupt, JupyterKernelGenException) as e:
         print(f"{colors.FAIL}ERROR: {e}{colors.ENDC}\nEXITING...")
         clean_exit(1, path)
