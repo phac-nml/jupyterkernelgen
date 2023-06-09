@@ -43,7 +43,7 @@ def check_for_conda() -> str:
 
     :returns: the path to the mamba or conda executable
     """
-    print(f"{colors.HEADER}LOOKING FOR CONDA...{colors.ENDC}")
+    print(f"{colors.HEADER}Looking for conda...{colors.ENDC}")
 
     conda_exe = None
     try:
@@ -74,7 +74,7 @@ def get_conda_env():
         # replace ~ with user's home directory and make it an absolute path
         # if ~ is not used to refer to the user's home directory, it will
         # just create an absolute path to the specified location
-        conda_env = os.path.abspath(os.path.expanduser(input(f"{colors.HEADER}ENTER PATH TO CONDA ENVIRONMENT{colors.ENDC}: ")))
+        conda_env = os.path.abspath(os.path.expanduser(input(f"{colors.HEADER}Enter path to conda environment{colors.ENDC}: ")))
 
         if os.path.isdir(conda_env + "/conda-meta"): # all conda environments have a /conda-meta directory
             print(f"- found conda env: {colors.OK}{conda_env}{colors.ENDC}\n")
@@ -100,7 +100,7 @@ def ipykernel_installed(conda_env: str) -> bool:
     :returns:           true if ipykernel and ipython are installed
                         and false otherwise
     """
-    print(f"{colors.HEADER}CHECKING FOR IPYTHON IN CONDA ENV...{colors.ENDC}")
+    print(f"{colors.HEADER}Checking for ipython in conda env...{colors.ENDC}")
 
     # We check for both ipykernel and ipython to be installed just to be doubly sure
     # that we have everything we need
@@ -136,7 +136,7 @@ def install_ipykernel(conda_exe: str, conda_env: str) -> None:
     :param conda_env:   the path to the environment to install to
     """
     # only install if the user enters `y`
-    print(f"{colors.HEADER}INSTALL ipykernel? [y/N]{colors.ENDC} ", end="", flush=True)
+    print(f"{colors.HEADER}Install ipykernel? [y/N]{colors.ENDC} ", end="", flush=True)
 
     inp = sys.stdin.read(1)
     if inp == "y":
@@ -156,7 +156,7 @@ def get_kernel_name() -> str:
 
     :returns: the name of the kernel
     """
-    print(f"{colors.HEADER}ENTER KERNEL NAME{colors.ENDC}: ", end="", flush=True)
+    print(f"{colors.HEADER}Enter kernel name{colors.ENDC}: ", end="", flush=True)
     kernel_name = sys.stdin.readline().strip()
     print()
 
@@ -169,7 +169,7 @@ def create_kernel_dir(kernel_name: str) -> str:
     :param kernel_name: the name of the kernel to generate
     :return:            the path to the new directory
     """
-    print(f"{colors.HEADER}CREATING KERNEL DIRECTORY...{colors.ENDC}")
+    print(f"{colors.HEADER}Creating kernel directory...{colors.ENDC}")
     path = None
     try:
         # replace ~ with the path to the user's home directory
@@ -189,7 +189,7 @@ def create_kernel_helper_script(path: str, conda_env: str) -> None:
     :param path:        the path to install the kernel to
     :param conda_env:   the path to the conda environment to launch with
     """
-    print(f"{colors.HEADER}CREATING KERNEL HELPER SCRIPT...{colors.ENDC}")
+    print(f"{colors.HEADER}Creating kernel helper script...{colors.ENDC}")
     source = f"""#!/bin/bash
 
 source activate {conda_env}
@@ -210,7 +210,7 @@ def create_kernel_json(path, kernel_name):
     :param path:        the path to install the kernel to
     :param kernel_name: the name of the kernel being installed
     """
-    print(f"{colors.HEADER}CREATING KERNEL JSON...{colors.ENDC}")
+    print(f"{colors.HEADER}Creating kernel json...{colors.ENDC}")
     source = f"""{{
   "argv": ["{{resource_dir}}/kernel-helper.sh", "python3", "-m", "ipykernel_launcher", "-f", "{{connection_file}}"],
   "display_name": "{kernel_name}",
