@@ -84,12 +84,12 @@ def get_conda_env():
 
     :returns: the path to the conda environment
     """
-    try:
-        while True:
+    while True:
+        try:
             # replace ~ with user's home directory and make it an absolute path
             # if ~ is not used to refer to the user's home directory, it will
             # just create an absolute path to the specified location
-            conda_env = os.path.abspath(os.path.expanduser(input(f"{text_styles.BOLD}Which conda environment do you want to use? Enter the path to its directory here: {text_styles.INPUT}{text_styles.DIRECTORY}")))
+            conda_env = os.path.abspath(os.path.expanduser(input(f"{text_styles.END}{text_styles.BOLD}Which conda environment do you want to use? Enter the path to its directory here: {text_styles.INPUT}")))
             print(text_styles.END, end="")
 
             if os.path.isdir(conda_env + "/conda-meta"): # all conda environments have a /conda-meta directory
@@ -97,9 +97,11 @@ def get_conda_env():
                 break
 
             print(f"{text_styles.FAIL}The given path is not a conda environment. Look for a directory that contains a folder called ``conda-meta''.{text_styles.END}", file=sys.stderr)
-
-    except (OSError, EOFError) as e:
-        raise JupyterKernelGenException(f"error occurred checking directory: {e}")
+        except EOFError as e:
+            print()
+            continue
+        except OSError as e:
+            raise JupyterKernelGenException(f"error occurred checking directory: {e}")
 
     return conda_env
 
@@ -167,7 +169,7 @@ def get_kernel_name() -> str:
     """
     while True:
         try_again = False
-        print(f"{text_styles.BOLD}What do you want to call the kernel? Use only letters, numbers, '-', '.', and '_': {text_styles.INPUT}", end="", flush=True)
+        print(f"{text_styles.END}{text_styles.BOLD}What do you want to call the kernel? Use only letters, numbers, '-', '.', and '_': {text_styles.INPUT}", end="", flush=True)
         kernel_name = sys.stdin.readline().strip()
         print(text_styles.END, end="")
 
