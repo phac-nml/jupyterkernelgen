@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+"""
+Generates a jupyter kernel from a given conda environment while ensuring
+that ipykernel is installed in that environment so that the kernel can be used.
+
+It prompts the user for the necessary inputs as it goes along and will not
+touch existing jupyter kernels.
+"""
+import argparse
 import os
 import re
 import glob
@@ -11,10 +19,26 @@ import subprocess
 readline.set_completer_delims(' \t\n=')
 readline.parse_and_bind("tab: complete")
 
-class JupyterKernelGenException(BaseException):
-    pass
+INTERACTIVE = False
 
-class text_styles:
+class ArgResult: # pylint: disable=too-few-public-methods
+    """
+    Defines the values that will be returned by the command line arguments
+    """
+    environment = None
+    name = None
+    interactive = False
+
+class JupyterKernelGenException(BaseException):
+    """
+    Defines an exception type for errors generating
+    a jupyter kernel
+    """
+
+class TextStyles: # pylint: disable=too-few-public-methods
+    """
+    Defines a set of text styling options to be placed in strings
+    """
     # Font styles
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
@@ -43,10 +67,10 @@ def clean_exit(exit_code: int, path: "str | None") -> None:
     :param path:        the path to remove if applicable
     """
     try:
-        if path != None:
+        if path is not None:
             shutil.rmtree(path)
-    except shutil.Error as e:
-        print(f"{text_styles.FAIL}failed to remove directory: {e}{text_styles.END}")
+    except shutil.Error as err:
+        print(f"{TextStyles.FAIL}failed to remove directory: {err}{TextStyles.END}")
 
     sys.exit(exit_code)
 
@@ -55,28 +79,65 @@ def check_for_conda() -> str:
     Looks for a mamba or conda executable on the system with a preference
     for mamba
 
-    :returns: the path to the mamba or conda executable
+    :returns:           the path to the mamba or conda executable
     """
-    print(f"{text_styles.BOLD}First we need to make sure that either mamba or conda is installed and is available on the PATH.{text_styles.END}")
+    if INTERACTIVE:
+        print(f"{TextStyles.BOLD}First we need to make sure that either \
+mamba or conda is installed and is available on the PATH.{TextStyles.END}")
 
     conda_exe = None
     try:
         conda_exe = shutil.which("mamba") # first try getting mamba because its faster
-    except shutil.Error as e: # error: exception trying to locate mamba, but we can still try conda
-        print(f"{text_styles.FAIL}error occurred getting mamba from path: {e}{text_styles.END}", file=sys.stderr)
+    except shutil.Error as err:
+        print(f"{TextStyles.FAIL}error occurred getting mamba from path: {err}{TextStyles.END}",
+              file=sys.stderr)
 
-    if conda_exe == None:
+    if conda_exe is None:
         try:
             conda_exe = shutil.which("conda") # try finding conda if mamba isn't available
-        except shutil.Error as e: # fatal error: exception trying to locate conda and mamba wasn't found
-            raise JupyterKernelGenException(f"error occurred getting conda from path: {e}")
+        except shutil.Error as err:
+            raise JupyterKernelGenException(f"error occurred getting conda from path: {err}") \
+                    from err
 
-        if conda_exe == None: # fatal error: no conda or mamba executable
-            raise JupyterKernelGenException("No mamba or conda programs were found on the PATH. Make sure that you have installed conda or mamba and that you have initialized it.")
+        if conda_exe is None: # fatal error: no conda or mamba executable
+            raise JupyterKernelGenException("No mamba or conda programs were found on the PATH. \
+Make sure that you have installed conda or mamba and that you have initialized it.")
 
-    print(f"Great! A conda program was found at {text_styles.DIRECTORY}{text_styles.OK}{conda_exe}{text_styles.END}.\n")
+    if INTERACTIVE:
+        print(f"Great! A conda program was found at {TextStyles.DIRECTORY}\
+{TextStyles.OK}{conda_exe}{TextStyles.END}.\n")
 
     return conda_exe
+
+def valid_conda_environment(path: str) -> bool:
+    """
+    Checks whether a conda environment is valid.
+
+    :param path:    the path to check
+    :returns:       true if the conda environment is valid, false otherwise
+    """
+    try:
+        # all conda environments have a /conda-meta directory
+        if os.path.isdir(get_abs_path(path) + "/conda-meta"):
+            return True
+    except OSError as err:
+        raise JupyterKernelGenException(f"error occurred checking directory: {err}") from err
+    return False
+
+def get_abs_path(path: str) -> str:
+    """
+    replace ~ with user's home directory and make it an absolute path
+    if ~ is not used to refer to the user's home directory, it will
+    just create an absolute path to the specified location.
+    Just returns the given path if it is already absolute.
+
+    :param path:    the path to make absolute
+    :return:        the created absolute path
+    """
+    try:
+        return os.path.abspath(os.path.expanduser(path).strip()).strip()
+    except OSError as err:
+        raise JupyterKernelGenException(f"failed to create absolute path: {err}") from err
 
 def get_conda_env():
     """
@@ -86,22 +147,23 @@ def get_conda_env():
     """
     while True:
         try:
-            # replace ~ with user's home directory and make it an absolute path
-            # if ~ is not used to refer to the user's home directory, it will
-            # just create an absolute path to the specified location
-            conda_env = os.path.abspath(os.path.expanduser(input(f"{text_styles.END}{text_styles.BOLD}Which conda environment do you want to use? Enter the path to its directory here: {text_styles.INPUT}")))
-            print(text_styles.END, end="")
+            conda_env = get_abs_path(input(f"{TextStyles.END}{TextStyles.BOLD}\
+Which conda environment do you want to use? Enter the path to its directory here: \
+{TextStyles.INPUT}"))
+            print(TextStyles.END, end="")
 
-            if os.path.isdir(conda_env + "/conda-meta"): # all conda environments have a /conda-meta directory
-                print(f"Using the conda environment at {text_styles.DIRECTORY}{text_styles.OK}{conda_env}{text_styles.END}.\n")
+            if valid_conda_environment(conda_env):
+                print(f"Using the conda environment at {TextStyles.DIRECTORY}{TextStyles.OK}\
+{conda_env}{TextStyles.END}.\n")
                 break
 
-            print(f"{text_styles.FAIL}The given path is not a conda environment. Look for a directory that contains a folder called ``conda-meta''.{text_styles.END}", file=sys.stderr)
-        except EOFError as e:
-            print()
+            print(f"{TextStyles.FAIL}The given path is not a conda environment. \
+Look for a directory that contains a folder called ``conda-meta''.{TextStyles.END}",
+                  file=sys.stderr)
+        except EOFError:
             continue
-        except OSError as e:
-            raise JupyterKernelGenException(f"error occurred checking directory: {e}")
+        except OSError as err:
+            raise JupyterKernelGenException(f"error occurred checking directory: {err}") from err
 
     return conda_env
 
@@ -116,8 +178,8 @@ def ipykernel_installed(conda_env: str) -> bool:
     directly.
 
     :param conda_env:   the path to a conda environment to check
-    :returns:           true if ipykernel and ipython are installed
-                        and false otherwise
+    :returns:           True if ipykernel and ipython are installed
+                        and False otherwise
     """
     # We check for both ipykernel and ipython to be installed just to be doubly sure
     # that we have everything we need
@@ -127,13 +189,15 @@ def ipykernel_installed(conda_env: str) -> bool:
             if os.path.exists(file):
                 found_kernel = True
                 break # exit the loop if one of the python versions has ipykernel
-        except OSError as e: # error: os.path.exists() failed, but we can just check the other directories in the glob
-            print(f"{text_styles.FAIL}error occurred checking for ipykernel: {e}{text_styles.END}", file=sys.stderr)
+        # error: os.path.exists() failed, but we can just check the other directories in the glob
+        except OSError as err:
+            print(f"{TextStyles.FAIL}error occurred checking for ipykernel: \
+{err}{TextStyles.END}", file=sys.stderr)
 
     try:
         found_ipython = os.path.isfile(conda_env + "/bin/ipython")
-    except OSError as e: # fatal error: os.path.isfile() failed
-        raise JupyterKernelGenException(f"error occurred checking for ipython: {e}")
+    except OSError as err: # fatal error: os.path.isfile() failed
+        raise JupyterKernelGenException(f"error occurred checking for ipython: {err}") from err
 
     return found_ipython and found_kernel
 
@@ -146,20 +210,60 @@ def install_ipykernel(conda_exe: str, conda_env: str) -> None:
     :param conda_env:   the path to the environment to install to
     """
     # only install if the user enters `y`. If any other character is entered, do not install
-    print(f"{text_styles.WARNING}The package ipykernel was not found in your conda environment. It is needed in order to create a jupyter kernel. Install it? [y/N]{text_styles.END} ", end="", flush=True)
+    if INTERACTIVE:
+        print(f"{TextStyles.WARNING}The package ipykernel was not found in your conda environment. \
+It is needed in order to create a jupyter kernel. Install it? [y/N]{TextStyles.END} ",
+              end="", flush=True)
 
-    inp = sys.stdin.read(1)
+    if INTERACTIVE:
+        inp = sys.stdin.read(1)
+    else:
+        inp = "y"
+
     if inp == "y":
         try:
-            subprocess.run([conda_exe, "install", "-p", conda_env, "-y", "ipykernel"])
-        except subprocess.CalledProcessError as e:
-            raise JupyterKernelGenException(f"ipykernel installation failed: {e}") # fatal error: we need ipykernel
+            subprocess.run([conda_exe, "install", "-p", conda_env, "-y", "ipykernel"], check=True)
+        except subprocess.CalledProcessError as err:
+            raise JupyterKernelGenException(f"ipykernel installation failed: {err}") from err
     else:
         # exit the script if the user does not want to install ipykernel since
         # we cannot continue without it
-        print(f"{text_styles.WARNING}ipykernel is needed to continue setting up the jupyter kernel. Exiting the program...{text_styles.END}")
+        print(f"{TextStyles.WARNING}ipykernel is needed \
+to continue setting up the jupyter kernel. Exiting the program...{TextStyles.END}")
         clean_exit(0,None)
-    print()
+
+def valid_kernel_name(name: str) -> bool:
+    """
+    Checks that the kernel name contains only letters, numbers, '-', '.', and '_'.
+
+    :param name:    the name to check
+    :return:        returns True if valid, False otherwise
+    """
+    try:
+        if re.search(r'^([a-zA-Z0-9]|-|\.|_)+$', name) is None:
+            print(f"{TextStyles.FAIL}invalid kernel name. \
+Use only letters, numbers, '-', '.', and '_'{TextStyles.END}")
+            return False
+    except re.error as err: # error: regex failed. Try again
+        print(f"{TextStyles.FAIL}failed to check kernel name: {err}{TextStyles.END}")
+        return False
+    # Generate potential paths where this kernel name may already be used
+    user_path = get_abs_path(f"~/.local/share/jupyter/kernels/{name}")
+    system_path1 = f"/usr/share/jupyter/kernels/{name}"
+    system_path2 = f"/usr/local/share/jupyter/kernels/{name}"
+    env_path = f"{sys.prefix}/share/jupyter/kernels/{name}"
+
+    try:
+        if os.path.exists(user_path) or \
+            os.path.exists(system_path1) or \
+            os.path.exists(system_path2) or \
+            os.path.exists(env_path):
+            print(f"{TextStyles.FAIL}environment with that name already exists{TextStyles.END}")
+            return False
+    except OSError as err: # error: checking kernel name against existing kernels failed. Try again
+        print(f"{TextStyles.FAIL}failed to check kernel name: {err}{TextStyles.END}")
+        return False
+    return True
 
 def get_kernel_name() -> str:
     """
@@ -169,36 +273,18 @@ def get_kernel_name() -> str:
     """
     while True:
         try_again = False
-        print(f"{text_styles.END}{text_styles.BOLD}What do you want to call the kernel? Use only letters, numbers, '-', '.', and '_': {text_styles.INPUT}", end="", flush=True)
+        print(f"{TextStyles.END}{TextStyles.BOLD}What do you want to call the kernel? \
+Use only letters, numbers, '-', '.', and '_': {TextStyles.INPUT}", end="", flush=True)
         kernel_name = sys.stdin.readline().strip()
-        print(text_styles.END, end="")
+        print(TextStyles.END, end="")
 
-        try:
-            if re.search(r'^([a-zA-Z0-9]|-|\.|_)+$', kernel_name) == None:
-                print(f"{text_styles.FAIL}invalid kernel name. Use only letters, numbers, '-', '.', and '_'{text_styles.END}")
-                try_again = True
-        except re.error as e: # error: regex failed. Try again
-            print(f"{text_styles.FAIL}failed to check kernel name: {e}{text_styles.END}")
-            continue
+        if not valid_kernel_name(kernel_name):
+            try_again = True
 
-        # Generate potential paths where this kernel name may already be used
-        user_path = os.path.expanduser(f"~/.local/share/jupyter/kernels/{kernel_name}")
-        system_path1 = f"/usr/share/jupyter/kernels/{kernel_name}"
-        system_path2 = f"/usr/local/share/jupyter/kernels/{kernel_name}"
-        env_path = f"{sys.prefix}/share/jupyter/kernels/{kernel_name}"
-
-        try:
-            if os.path.exists(user_path) or os.path.exists(system_path1) or os.path.exists(system_path2) or os.path.exists(env_path):
-                print(f"{text_styles.FAIL}environment with that name already exists{text_styles.END}")
-                try_again = True
-        except OSError as e: # error: checking kernel name against existing kernels failed. Try again
-            print(f"{text_styles.FAIL}failed to check kernel name: {e}{text_styles.END}")
-            continue
-
-        # use a break instead of looping on try_again, so that python type hinting knows that the return value cannot be None
+        # use a break instead of looping on try_again,
+        # so that python type hinting knows that the return value cannot be None
         if not try_again:
             break
-    print()
 
     return kernel_name
 
@@ -212,12 +298,16 @@ def create_kernel_dir(kernel_name: str) -> str:
     path = None
     try:
         # replace ~ with the path to the user's home directory
-        path = os.path.expanduser(f"~/.local/share/jupyter/kernels/{kernel_name}")
-        print(f"{text_styles.BOLD}Installing the kernel at {text_styles.DIRECTORY}{path}{text_styles.END}{text_styles.BOLD}.{text_styles.END}")
+        path = get_abs_path(f"~/.local/share/jupyter/kernels/{kernel_name}")
+        if INTERACTIVE:
+            print(f"{TextStyles.BOLD}Installing the kernel at {TextStyles.DIRECTORY}\
+{path}{TextStyles.END}{TextStyles.BOLD}.{TextStyles.END}")
         os.makedirs(path, exist_ok=True)
-        print(f"Directory created at {text_styles.DIRECTORY}{text_styles.OK}{path}{text_styles.END}.")
-    except OSError as e: # fatal error: cannot create the directory
-        raise JupyterKernelGenException(f"failed to create directory: {e}")
+        if INTERACTIVE:
+            print(f"Directory created at {TextStyles.DIRECTORY}{TextStyles.OK}\
+{path}{TextStyles.END}.")
+    except OSError as err: # fatal error: cannot create the directory
+        raise JupyterKernelGenException(f"failed to create directory: {err}") from err
     return path
 
 def create_kernel_helper_script(path: str, conda_env: str) -> None:
@@ -233,12 +323,14 @@ source activate {conda_env}
 exec "$@"
 """
     try:
-        f = open(path + "/kernel-helper.sh", "w")
-        f.write(source)
-        f.close()
-        print(f"Helper script created at {text_styles.DIRECTORY}{text_styles.OK}{path}/kernel-helper.sh{text_styles.END}.")
-    except OSError as e: # fatal error: failed to create the helper script
-        raise JupyterKernelGenException(f"failed to write to {path}/kernel-helper.sh: {e}")
+        with open(path + "/kernel-helper.sh", "w", encoding="UTF-8") as file:
+            file.write(source)
+        if INTERACTIVE:
+            print(f"Helper script created at {TextStyles.DIRECTORY}\
+{TextStyles.OK}{path}/kernel-helper.sh{TextStyles.END}.")
+    except OSError as err: # fatal error: failed to create the helper script
+        raise JupyterKernelGenException(f"failed to write to \
+{path}/kernel-helper.sh: {err}") from err
 
 def create_kernel_json(path, kernel_name):
     """
@@ -253,29 +345,101 @@ def create_kernel_json(path, kernel_name):
   "language": "python"
 }}"""
     try:
-        f = open(path + "/kernel.json", "w")
-        f.write(source)
-        f.close()
-        print(f"Kernel definition created at {text_styles.DIRECTORY}{text_styles.OK}{path}/kernel.json{text_styles.END}.")
-    except OSError as e: # fatal error: failed to create kernel.json
-        raise JupyterKernelGenException(f"failed to write to {path}/kernel.json: {e}")
-    print()
+        with open(path + "/kernel.json", "w", encoding="UTF-8") as file:
+            file.write(source)
+        if INTERACTIVE:
+            print(f"Kernel definition created at {TextStyles.DIRECTORY}{TextStyles.OK}\
+{path}/kernel.json{TextStyles.END}.")
+    except OSError as err: # fatal error: failed to create kernel.json
+        raise JupyterKernelGenException(f"failed to write to {path}/kernel.json: {err}") from err
 
 def program_info():
-    print(f"{text_styles.BOLD}Welcome to jupyterkernelgen. This program will guide you through creating a new kernel for jupyter.{text_styles.END}\n")
+    """
+    print program info if interactive mode is active
+    """
+    if INTERACTIVE:
+        print(f"{TextStyles.BOLD}Welcome to jupyterkernelgen. \
+This program will guide you through creating a \
+new kernel for jupyter.{TextStyles.END}\n")
 
-def main():
-    path = None
-    program_info()
+def handle_args() -> ArgResult:
+    """
+    Parse command line arguments.
+
+    :return:    a tuple of strings (path,name)
+    """
+    parser = argparse.ArgumentParser(prog="jupyterkernelgen",
+        description="generates a jupyter kernel from a given conda environment")
+    parser.add_argument("-i", "--interactive", action="store_true", dest="interactive",
+        help="run this program in a friendly interactive mode.")
+    parser.add_argument("-e", "--environment", action="store", dest="environment",
+        help="the path to a conda environment to use. May be a relative or absolute path.")
+    parser.add_argument("-n", "--name", action="store", dest="name",
+        help="the name of the kernel to create. Must contain \
+                only letters, numbers, '-', '.', and '_'.")
     try:
+        args = parser.parse_args()
+        if args.interactive and args.environment is not None:
+            print(f"{TextStyles.WARNING}Interactive mode: ignoring \
+                    environment argument.{TextStyles.END}")
+        if args.interactive and args.name is not None:
+            print(f"{TextStyles.WARNING}Interactive mode: ignoring \
+                    name argument.{TextStyles.END}")
+
+        if not args.interactive and args.environment is None and args.name is None:
+            parser.print_help()
+            sys.exit(0)
+        elif not args.interactive and (args.environment is None or args.name is None):
+            print(f"{TextStyles.FAIL}Both the environment and the name are required when \
+interactive mode is off.{TextStyles.END}")
+            parser.print_help()
+            sys.exit(1)
+
+        res = ArgResult()
+        res.environment = args.environment
+        res.name = args.name
+        res.interactive = args.interactive
+
+        return res
+    except argparse.ArgumentError as err:
+        print(f"{TextStyles.FAIL}Failed to parse arguments: {err}{TextStyles.END}")
+        parser.print_help()
+        sys.exit(1)
+
+def install(conda_env: "str | None", kernel_name: "str | None",
+            interactive_mode: bool=False) -> None:
+    """
+    Installs the jupyter kernel
+
+    :param conda_env:           the conda environment to use for the install
+    :param kernel_name:         the name of the kernel to install
+    :param interactive_mode:    whether interactive mode is active
+    """
+    global INTERACTIVE # pylint: disable=global-statement
+    INTERACTIVE = interactive_mode
+    path = None
+    try:
+        if (conda_env is None or kernel_name is None) and not INTERACTIVE:
+            raise JupyterKernelGenException("Both conda_env and kernel name must be defined \
+when not in interactive mode")
+        if conda_env is not None and not valid_conda_environment(conda_env):
+            raise JupyterKernelGenException(f"{conda_env} is not a valid conda environment. \
+Look for a directory containing a folder called ``conda-meta''.")
+        if kernel_name is not None and not valid_kernel_name(kernel_name):
+            raise JupyterKernelGenException()
+        if conda_env is not None:
+            conda_env = get_abs_path(conda_env)
+
         # Make sure conda or mamba is installed
         conda_exe = check_for_conda()
 
         # Figure out which conda environment to use
-        conda_env = get_conda_env()
+        if INTERACTIVE or conda_env is None: # the None check is needed for type hinting
+            conda_env = get_conda_env()
 
         # Get the name of the kernel
-        kernel_name = get_kernel_name()
+        if INTERACTIVE or kernel_name is None: # the None check is need for type hinting
+            kernel_name = get_kernel_name()
 
         # Ensure that ipykernel is installed
         installed = ipykernel_installed(conda_env)
@@ -285,9 +449,10 @@ def main():
 
             # Exit if ipykernel failed to install
             if not ipykernel_installed(conda_env):
-                print(f"{text_styles.FAIL}ipykernel installation failed{text_styles.END}")
+                print(f"{TextStyles.FAIL}ipykernel installation failed{TextStyles.END}")
                 clean_exit(1, path)
-        print(f"{text_styles.OK}All necessary packages are installed.\n{text_styles.END}")
+        if INTERACTIVE:
+            print(f"{TextStyles.OK}All necessary packages are installed.\n{TextStyles.END}")
 
         # Create a directory for the kernel
         path = create_kernel_dir(kernel_name)
@@ -298,14 +463,26 @@ def main():
         # Create json to define the kernel
         create_kernel_json(path, kernel_name)
 
-        print(f"{text_styles.OK}Kernel installation success{text_styles.END}")
+        print(f"{TextStyles.OK}Installed kernel at {TextStyles.DIRECTORY}{path}{TextStyles.END}\
+{TextStyles.OK} using conda environment: {TextStyles.DIRECTORY}{conda_env}{TextStyles.END}")
 
-    except (KeyboardInterrupt, JupyterKernelGenException) as e:
-        if len(str(e)) == 0:
-            print(f"{text_styles.END}\nEXITING...")
+    except (KeyboardInterrupt, JupyterKernelGenException) as err:
+        if len(str(err)) == 0:
+            print(f"{TextStyles.END}\nEXITING...")
         else:
-            print(f"{text_styles.FAIL}ERROR: {e}{text_styles.END}\nEXITING...")
+            print(f"{TextStyles.FAIL}ERROR: {err}{TextStyles.END}\nEXITING...")
         clean_exit(1, path)
+
+def main() -> None:
+    """
+    main function: runs the program
+    """
+    args = handle_args()
+    conda_env = args.environment
+    kernel_name = args.name
+    interactive_mode = args.interactive
+    program_info()
+    install(conda_env, kernel_name, interactive_mode)
 
 if __name__=="__main__":
     main()

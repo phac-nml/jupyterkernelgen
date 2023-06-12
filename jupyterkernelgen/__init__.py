@@ -1,1 +1,1 @@
-from .jupyterkernelgen import main
+from .jupyterkernelgen import install
