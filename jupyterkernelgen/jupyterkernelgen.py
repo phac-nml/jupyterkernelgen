@@ -25,7 +25,7 @@ class ArgResult: # pylint: disable=too-few-public-methods
     """
     environment = None
     name = None
-    interactive = False
+    yes = False
 
 class JupyterKernelGenException(BaseException):
     """
@@ -196,26 +196,27 @@ def ipykernel_installed(conda_env: str) -> bool:
 
     return found_ipython and found_kernel
 
-def install_ipykernel(conda_exe: str, conda_env: str) -> None:
+def install_ipykernel(conda_exe: str, conda_env: str, yes: bool) -> None:
     """
     Installs ipykernel into a specific conda envionment using a given
     conda executable
 
     :param conda_exe:   the path to the executable for conda
     :param conda_env:   the path to the environment to install to
+    :param yes:         install without prompt
     """
     # only install if the user enters `y`. If any other character is entered, do not install
     print(f"{TextStyles.WARNING}The package ipykernel was not found in your conda environment. \
-It is needed in order to create a jupyter kernel. Install it? [y/N]{TextStyles.END} ",
-          end="", flush=True)
+It is needed in order to create a jupyter kernel.{TextStyles.END}")
+    if not yes:
+        inp = input("Install ipykernel? [y/N] ")
 
-    inp = input()
-
-    yes = False
-    try:
-        yes = re.search(r'^y', inp) is not None
-    except re.error as err:
-        print(f"{TextStyles.WARNING}Failed to check input: {err}{TextStyles.END}")
+        try:
+            yes = re.search(r'^y', inp) is not None
+        except re.error as err:
+            print(f"{TextStyles.WARNING}Failed to check input: {err}{TextStyles.END}")
+    else:
+        print("Installing ipykernel...")
 
     if yes:
         try:
@@ -366,12 +367,15 @@ def handle_args() -> ArgResult:
     parser.add_argument("-n", "--name", action="store", dest="name",
         help="the name of the kernel to create. Must contain \
                 only letters, numbers, '-', '.', and '_'.")
+    parser.add_argument("-y", "--yes", action="store_true", dest="yes",
+        help="automatically accept installation of packages.")
     try:
         args = parser.parse_args()
 
         res = ArgResult()
         res.environment = args.environment
         res.name = args.name
+        res.yes = args.yes
 
         return res
     except argparse.ArgumentError as err:
@@ -379,12 +383,13 @@ def handle_args() -> ArgResult:
         parser.print_help()
         sys.exit(1)
 
-def install(conda_env: "str | None" = None, kernel_name: "str | None" = None) -> None:
+def install(conda_env: "str | None" = None, kernel_name: "str | None" = None, yes: bool = False) -> None:
     """
     Installs the jupyter kernel
 
-    :param conda_env:           the conda environment to use for the install
-    :param kernel_name:         the name of the kernel to install
+    :param conda_env:   the conda environment to use for the install
+    :param kernel_name: the name of the kernel to install
+    :param yes:         accept installation of packages without prompts
     """
 
     program_info()
@@ -414,7 +419,7 @@ Look for a directory containing a folder called ``conda-meta''.")
         installed = ipykernel_installed(conda_env)
         if not installed:
             # Install ipykernel if necessary
-            install_ipykernel(conda_exe, conda_env)
+            install_ipykernel(conda_exe, conda_env, yes)
 
             # Exit if ipykernel failed to install
             if not ipykernel_installed(conda_env):
@@ -448,7 +453,8 @@ def main() -> None:
     args = handle_args()
     conda_env = args.environment
     kernel_name = args.name
-    install(conda_env, kernel_name)
+    yes = args.yes
+    install(conda_env, kernel_name, yes)
 
 if __name__=="__main__":
     main()
