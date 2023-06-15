@@ -19,8 +19,6 @@ import subprocess
 readline.set_completer_delims(' \t\n=')
 readline.parse_and_bind("tab: complete")
 
-INTERACTIVE = False
-
 class ArgResult: # pylint: disable=too-few-public-methods
     """
     Defines the values that will be returned by the command line arguments
@@ -148,7 +146,6 @@ def get_conda_env():
 Which conda environment do you want to use? Enter the path to its directory here: \
 {TextStyles.END}", end="")
             conda_env = get_abs_path(input())
-            print(conda_env)
 
             if valid_conda_environment(conda_env):
                 print(f"Using the conda environment at {TextStyles.DIRECTORY}{TextStyles.OK}\
@@ -213,7 +210,6 @@ It is needed in order to create a jupyter kernel. Install it? [y/N]{TextStyles.E
           end="", flush=True)
 
     inp = input()
-    print(inp)
 
     yes = False
     try:
@@ -277,7 +273,6 @@ def get_kernel_name() -> str:
         print(f"{TextStyles.END}{TextStyles.BOLD}What do you want to call the kernel? \
 Use only letters, numbers, '-', '.', and '_': {TextStyles.END}", end="", flush=True)
         kernel_name = input()
-        print(kernel_name)
 
         if not valid_kernel_name(kernel_name):
             try_again = True
@@ -391,7 +386,9 @@ def install(conda_env: "str | None" = None, kernel_name: "str | None" = None) ->
     :param conda_env:           the conda environment to use for the install
     :param kernel_name:         the name of the kernel to install
     """
-    global INTERACTIVE # pylint: disable=global-statement
+
+    program_info()
+
     path = None
     try:
         if conda_env is not None and not valid_conda_environment(conda_env):
@@ -423,8 +420,7 @@ Look for a directory containing a folder called ``conda-meta''.")
             if not ipykernel_installed(conda_env):
                 print(f"{TextStyles.FAIL}ipykernel installation failed{TextStyles.END}")
                 clean_exit(1, path)
-        if INTERACTIVE:
-            print(f"{TextStyles.OK}All necessary packages are installed.\n{TextStyles.END}")
+        print(f"{TextStyles.OK}All necessary packages are installed.\n{TextStyles.END}")
 
         # Create a directory for the kernel
         path = create_kernel_dir(kernel_name)
@@ -452,7 +448,6 @@ def main() -> None:
     args = handle_args()
     conda_env = args.environment
     kernel_name = args.name
-    program_info()
     install(conda_env, kernel_name)
 
 if __name__=="__main__":
