@@ -29,18 +29,10 @@ $ pip install jupyterkernelgen
 
 ```sh
 $ jupyterkernelgen --help
-```
-
-```sh
-$ jupyterkernelgen -e ~/path/to/environment -n kernel-name
-```
-
-```sh
-$ jupyterkernelgen -e ../path/to/environment -n kernel-name -y
-```
-
-```sh
-$ jupyterkernelgen -e ~/path/to/environment -n kernel-name
+$ jupyterkernelgen
+$ jupyterkernelgen -e ~/path/to/environment-1 -n kernel-name1
+$ jupyterkernelgen -e ../path/to/environment-2 -n kernel-name2 -y
+$ jupyterkernelgen -e ~/path/to/environment-3 -n kernel-name3
 ```
 
 #### Arguments
@@ -63,8 +55,8 @@ $ jupyterkernelgen -e ~/path/to/environment -n kernel-name
 import jupyterkernelgen
 
 jupyterkernelgen.install() # Install a kernel interactively
-jupyterkernelgen.install(environment="/path/to/environment", name="kernel-name") # Install a kernel with a specified path and name
-jupyterkernelgen.install(environment="/path/to/environment", name="kernel-name", yes=True) # Install a kernel without prompts
+jupyterkernelgen.install(environment="/path/to/environment-1", name="kernel-name1") # Install a kernel with a specified path and name
+jupyterkernelgen.install(environment="/path/to/environment-2", name="kernel-name2", yes=True) # Install a kernel without prompts
 ```
 
 #### Arguments
