@@ -13,7 +13,7 @@ Pypi Installation:
 [https://pypi.org/project/jupyterkernelgen](https://pypi.org/project/jupyterkernelgen)
 
 ```sh
-$ pip install jupyterkernelgen
+pip install jupyterkernelgen
 ```
 
 ## How to use:
@@ -28,11 +28,11 @@ $ pip install jupyterkernelgen
 #### Examples
 
 ```sh
-$ jupyterkernelgen --help
-$ jupyterkernelgen
-$ jupyterkernelgen -e ~/path/to/environment-1 -n kernel-name1
-$ jupyterkernelgen -e ../path/to/environment-2 -n kernel-name2 -y
-$ jupyterkernelgen -e ~/path/to/environment-3 -n kernel-name3
+jupyterkernelgen --help
+jupyterkernelgen
+jupyterkernelgen -e ~/path/to/environment-1 -n kernel-name1
+jupyterkernelgen -e ../path/to/environment-2 -n kernel-name2 -y
+jupyterkernelgen -e ~/path/to/environment-3 -n kernel-name3
 ```
 
 #### Arguments
@@ -72,19 +72,19 @@ jupyterkernelgen.install(environment="/path/to/environment-2", name="kernel-name
 1. Clone the repository:
 
 ```sh
-$ git clone https://github.com/phac-nml/jupyterkernelgen.git
+git clone https://github.com/phac-nml/jupyterkernelgen.git
 ```
 
 2. Install the project:
 
 ```sh
-$ cd jupyterkernelgen
-$ pip install .
+cd jupyterkernelgen
+pip install .
 ```
 
 3. Execute the program:
 ```sh
-$ jupyterkernelgen [-h] [-e ENVIRONMENT] [-n NAME] [-y]
+jupyterkernelgen [-h] [-e ENVIRONMENT] [-n NAME] [-y]
 ```
 
 ## Developer Notes
