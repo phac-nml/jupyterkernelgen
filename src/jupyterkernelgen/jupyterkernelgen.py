@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Generates a jupyter kernel from a given conda environment while ensuring
 that ipykernel is installed in that environment so that the kernel can be used.
@@ -14,6 +13,7 @@ import shutil
 import sys
 import readline
 import subprocess
+import pkg_resources
 
 # allow tab completion in input()
 readline.set_completer_delims(' \t\n=')
@@ -369,6 +369,8 @@ def handle_args() -> ArgResult:
                 only letters, numbers, '-', '.', and '_'.")
     parser.add_argument("-y", "--yes", action="store_true", dest="yes",
         help="automatically accept installation of packages.")
+    parser.add_argument("-v", "--version", action="version", version="%(prog)s " +
+                        pkg_resources.get_distribution('jupyterkernelgen').version)
     try:
         args = parser.parse_args()
 
@@ -383,12 +385,12 @@ def handle_args() -> ArgResult:
         parser.print_help()
         sys.exit(1)
 
-def install(conda_env: "str | None" = None, kernel_name: "str | None" = None, yes: bool = False) -> None:
+def install(environment: "str | None" = None, name: "str | None" = None, yes: bool = False) -> None:
     """
     Installs the jupyter kernel
 
-    :param conda_env:   the conda environment to use for the install
-    :param kernel_name: the name of the kernel to install
+    :param environment: the conda environment to use for the install
+    :param name:        the name of the kernel to install
     :param yes:         accept installation of packages without prompts
     """
 
@@ -396,48 +398,48 @@ def install(conda_env: "str | None" = None, kernel_name: "str | None" = None, ye
 
     path = None
     try:
-        if conda_env is not None and not valid_conda_environment(conda_env):
-            raise JupyterKernelGenException(f"{conda_env} is not a valid conda environment. \
+        if environment is not None and not valid_conda_environment(environment):
+            raise JupyterKernelGenException(f"{environment} is not a valid conda environment. \
 Look for a directory containing a folder called ``conda-meta''.")
-        if kernel_name is not None and not valid_kernel_name(kernel_name):
+        if name is not None and not valid_kernel_name(name):
             raise JupyterKernelGenException()
-        if conda_env is not None:
-            conda_env = get_abs_path(conda_env)
+        if environment is not None:
+            environment = get_abs_path(environment)
 
         # Make sure conda or mamba is installed
         conda_exe = check_for_conda()
 
         # Figure out which conda environment to use
-        if conda_env is None:
-            conda_env = get_conda_env()
+        if environment is None:
+            environment = get_conda_env()
 
         # Get the name of the kernel
-        if kernel_name is None:
-            kernel_name = get_kernel_name()
+        if name is None:
+            name = get_kernel_name()
 
         # Ensure that ipykernel is installed
-        installed = ipykernel_installed(conda_env)
+        installed = ipykernel_installed(environment)
         if not installed:
             # Install ipykernel if necessary
-            install_ipykernel(conda_exe, conda_env, yes)
+            install_ipykernel(conda_exe, environment, yes)
 
             # Exit if ipykernel failed to install
-            if not ipykernel_installed(conda_env):
+            if not ipykernel_installed(environment):
                 print(f"{TextStyles.FAIL}ipykernel installation failed{TextStyles.END}")
                 clean_exit(1, path)
         print(f"{TextStyles.OK}All necessary packages are installed.\n{TextStyles.END}")
 
         # Create a directory for the kernel
-        path = create_kernel_dir(kernel_name)
+        path = create_kernel_dir(name)
 
         # Create script to launch the kernel
-        create_kernel_helper_script(path, conda_env)
+        create_kernel_helper_script(path, environment)
 
         # Create json to define the kernel
-        create_kernel_json(path, kernel_name)
+        create_kernel_json(path, name)
 
         print(f"{TextStyles.OK}Installed kernel at {TextStyles.DIRECTORY}{path}{TextStyles.END}\
-{TextStyles.OK} using conda environment: {TextStyles.DIRECTORY}{conda_env}{TextStyles.END}")
+{TextStyles.OK} using conda environment: {TextStyles.DIRECTORY}{environment}{TextStyles.END}")
 
     except (KeyboardInterrupt, JupyterKernelGenException) as err:
         if len(str(err)) == 0:
@@ -455,6 +457,3 @@ def main() -> None:
     kernel_name = args.name
     yes = args.yes
     install(conda_env, kernel_name, yes)
-
-if __name__=="__main__":
-    main()
