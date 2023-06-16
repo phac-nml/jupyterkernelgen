@@ -369,7 +369,8 @@ def handle_args() -> ArgResult:
                 only letters, numbers, '-', '.', and '_'.")
     parser.add_argument("-y", "--yes", action="store_true", dest="yes",
         help="automatically accept installation of packages.")
-    parser.add_argument("-v", "--version", action="version", version="%(prog)s " + pkg_resources.get_distribution('jupyterkernelgen').version)
+    parser.add_argument("-v", "--version", action="version", version="%(prog)s " +
+                        pkg_resources.get_distribution('jupyterkernelgen').version)
     try:
         args = parser.parse_args()
 
