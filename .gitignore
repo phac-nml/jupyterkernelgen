@@ -1,4 +1,5 @@
 build/*
+dist/*
 src/jupyterkernelgen.egg-info/*
 src/jupyterkernelgen/__pycache__/*
 src/jupyterkernelgen/__init__.pyc
