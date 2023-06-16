@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jupyterkernelgen"
-version = "0.0.1"
+version = "0.1.0"
 authors = [
     {name="Jacob Janzen", email="jacob.janzen@phac-aspc.gc.ca"},
     {name="Philip Mabon", email="philip.mabon@phac-aspc.gc.ca"},
